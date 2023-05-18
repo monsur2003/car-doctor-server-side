@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-// import { MongoClient } from "mongodb";
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5000;
@@ -13,7 +13,6 @@ app.get("/", (req, res) => {
    res.send("hello doctor of car ");
 });
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.kjf5ogd.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -31,10 +30,42 @@ async function run() {
       await client.connect();
 
       const servicesCollection = client.db("cardoctor").collection("services");
+      const bookingCollection = client.db("cardoctor").collection("bookings");
 
       app.get("/services", async (req, res) => {
          const cursor = servicesCollection.find();
          const result = await cursor.toArray();
+         res.send(result);
+      });
+
+      app.get("/services/:id", async (req, res) => {
+         const id = req.params.id;
+         const query = { _id: new ObjectId(id) };
+         console.log("query from 45 lines", query);
+         const result = await servicesCollection.findOne(query);
+         res.send(result);
+      });
+
+      //   booking section
+      app.post("/bookings", async (req, res) => {
+         const booking = req.body;
+         const result = await bookingCollection.insertOne(booking);
+         res.send(result);
+      });
+
+      app.get("/bookings", async (req, res) => {
+         let query = {};
+         if (req.query?.email) {
+            query = { email: req.query.email };
+         }
+         const result = await bookingCollection.find(query).toArray();
+         res.send(result);
+      });
+
+      app.delete("/bookings/:id", async (req, res) => {
+         const id = req.params.id;
+         const deleteOne = { _id: new ObjectId(id) };
+         const result = await bookingCollection.deleteOne(deleteOne);
          res.send(result);
       });
 
