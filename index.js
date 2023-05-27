@@ -1,8 +1,10 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const app = express();
+
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -23,6 +25,25 @@ const client = new MongoClient(uri, {
       deprecationErrors: true,
    },
 });
+// jwt verify
+const verifyJwt = (req, res, next) => {
+   // console.log(req.headers.autorization);
+   const authorization = req.headers.autorization;
+   if (!authorization) {
+      return res
+         .status(401)
+         .send({ error: true, message: "Unauthorized Access" });
+   }
+
+   const token = authorization.split(" ")[1];
+   jwt.verify(token, process.env.JWT_SECRET, (error, decoded) => {
+      if (error) {
+         return res.send({ error: true, message: "Unauthorized" });
+      }
+      req.decoded = decoded;
+      next();
+   });
+};
 
 async function run() {
    try {
@@ -31,6 +52,15 @@ async function run() {
 
       const servicesCollection = client.db("cardoctor").collection("services");
       const bookingCollection = client.db("cardoctor").collection("bookings");
+
+      app.post("/jwt", (req, res) => {
+         const user = req.body;
+         console.log(user);
+         const token = jwt.sign(user, process.env.JWT_SECRET, {
+            expiresIn: "1h",
+         });
+         res.send({ token });
+      });
 
       app.get("/services", async (req, res) => {
          const cursor = servicesCollection.find();
@@ -53,12 +83,29 @@ async function run() {
          res.send(result);
       });
 
-      app.get("/bookings", async (req, res) => {
+      app.get("/bookings", verifyJwt, async (req, res) => {
+         // console.log(req.headers.autorization);
          let query = {};
          if (req.query?.email) {
             query = { email: req.query.email };
          }
          const result = await bookingCollection.find(query).toArray();
+         res.send(result);
+      });
+
+      //   update booking
+
+      app.patch("/bookings/:id", async (req, res) => {
+         const id = req.params.id;
+         const booking = req.body;
+         console.log(booking);
+         const filter = { _id: new ObjectId(id) };
+         const updateDoc = {
+            $set: {
+               status: booking.statusbar,
+            },
+         };
+         const result = await bookingCollection.updateOne(filter, updateDoc);
          res.send(result);
       });
 
